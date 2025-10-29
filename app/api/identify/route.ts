@@ -47,8 +47,13 @@ Return ONLY a JSON object with these 10 scores, nothing else.`,
 
     console.log("[v0] Vision analysis:", text)
 
+    const cleanedText = text
+      .replace(/```json\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim()
+
     // Parse the feature scores
-    const features = JSON.parse(text)
+    const features = JSON.parse(cleanedText)
 
     // Convert features to a 200-dimensional vector by repeating and transforming
     const featureVector = generateFeatureVector(features)
