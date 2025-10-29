@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { embed } from "ai"
+import { generateText } from "ai"
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,15 +12,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 })
     }
 
-    console.log("[v0] Generating image embedding...")
+    console.log("[v0] Analyzing font with vision model...")
 
-    // Generate embedding for the uploaded font image
-    const { embedding: uploadedEmbedding } = await embed({
-      model: "openai/text-embedding-3-small",
-      value: image,
+    const { text } = await generateText({
+      model: "openai/gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              image: image,
+            },
+            {
+              type: "text",
+              text: `Analyze this font image and extract these visual features as numbers between 0 and 1:
+1. serif_score (0=sans-serif, 1=serif)
+2. weight_score (0=thin, 0.5=regular, 1=black)
+3. width_score (0=condensed, 0.5=normal, 1=expanded)
+4. slant_score (0=upright, 1=italic)
+5. contrast_score (0=low contrast, 1=high contrast)
+6. x_height_score (0=small x-height, 1=large x-height)
+7. decorative_score (0=plain, 1=highly decorative)
+8. script_score (0=not script, 1=script/handwriting)
+9. geometric_score (0=humanist, 1=geometric)
+10. modern_score (0=traditional, 1=modern)
+
+Return ONLY a JSON object with these 10 scores, nothing else.`,
+            },
+          ],
+        },
+      ],
     })
 
-    console.log("[v0] Embedding generated, dimensions:", uploadedEmbedding.length)
+    console.log("[v0] Vision analysis:", text)
+
+    // Parse the feature scores
+    const features = JSON.parse(text)
+
+    // Convert features to a 200-dimensional vector by repeating and transforming
+    const featureVector = generateFeatureVector(features)
+
+    console.log("[v0] Generated feature vector, dimensions:", featureVector.length)
 
     // Load Fontjoy's pre-computed font vectors
     console.log("[v0] Loading Fontjoy font vectors...")
@@ -33,13 +66,13 @@ export async function POST(request: NextRequest) {
 
     // Calculate cosine similarity for each font
     const similarities = fontVectorsData.items.map((font: any) => {
-      const similarity = cosineSimilarity(uploadedEmbedding, font.vectors[0])
+      const similarity = cosineSimilarity(featureVector, font.vectors[0])
       return {
         family: font.family,
         variant: font.variants?.[0] || "regular",
         category: font.category,
         similarity,
-        confidence: (similarity + 1) / 2, // Convert from [-1, 1] to [0, 1]
+        confidence: Math.max(0, Math.min(1, (similarity + 1) / 2)), // Convert from [-1, 1] to [0, 1]
       }
     })
 
@@ -64,12 +97,57 @@ export async function POST(request: NextRequest) {
   }
 }
 
+function generateFeatureVector(features: any): number[] {
+  const baseFeatures = [
+    features.serif_score,
+    features.weight_score,
+    features.width_score,
+    features.slant_score,
+    features.contrast_score,
+    features.x_height_score,
+    features.decorative_score,
+    features.script_score,
+    features.geometric_score,
+    features.modern_score,
+  ]
+
+  // Expand to 200 dimensions using polynomial features and transformations
+  const expanded: number[] = []
+
+  // Add base features
+  expanded.push(...baseFeatures)
+
+  // Add squared features
+  expanded.push(...baseFeatures.map((f) => f * f))
+
+  // Add pairwise products
+  for (let i = 0; i < baseFeatures.length; i++) {
+    for (let j = i + 1; j < baseFeatures.length; j++) {
+      expanded.push(baseFeatures[i] * baseFeatures[j])
+    }
+  }
+
+  // Add sine/cosine transformations
+  expanded.push(...baseFeatures.map((f) => Math.sin(f * Math.PI)))
+  expanded.push(...baseFeatures.map((f) => Math.cos(f * Math.PI)))
+
+  // Add exponential features
+  expanded.push(...baseFeatures.map((f) => Math.exp(-f)))
+
+  // Add log features (with small offset to avoid log(0))
+  expanded.push(...baseFeatures.map((f) => Math.log(f + 0.01)))
+
+  // Pad or truncate to exactly 200 dimensions
+  while (expanded.length < 200) {
+    expanded.push(0)
+  }
+
+  return expanded.slice(0, 200)
+}
+
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) {
-    // If dimensions don't match, pad the shorter one with zeros
-    const maxLen = Math.max(a.length, b.length)
-    a = [...a, ...Array(maxLen - a.length).fill(0)]
-    b = [...b, ...Array(maxLen - b.length).fill(0)]
+    throw new Error(`Vector dimensions don't match: ${a.length} vs ${b.length}`)
   }
 
   let dotProduct = 0

@@ -12,48 +12,6 @@ interface FontResult {
   category: string
 }
 
-const FONT_DATABASE = [
-  // Ultra-bold condensed fonts (Impact-like)
-  { family: "Anton", category: "sans-serif", weight: "black", width: "condensed", popularity: 95 },
-  { family: "Bebas Neue", category: "display", weight: "black", width: "condensed", popularity: 90 },
-  { family: "Oswald", category: "sans-serif", weight: "bold", width: "condensed", popularity: 92 },
-  { family: "Archivo Black", category: "sans-serif", weight: "black", width: "normal", popularity: 75 },
-  { family: "Alfa Slab One", category: "display", weight: "black", width: "normal", popularity: 70 },
-
-  // Bold serif fonts
-  { family: "Playfair Display", category: "serif", weight: "bold", width: "normal", popularity: 95 },
-  { family: "Merriweather", category: "serif", weight: "bold", width: "normal", popularity: 90 },
-  { family: "Libre Baskerville", category: "serif", weight: "bold", width: "normal", popularity: 85 },
-  { family: "Lora", category: "serif", weight: "medium", width: "normal", popularity: 88 },
-  { family: "Crimson Text", category: "serif", weight: "medium", width: "normal", popularity: 80 },
-  { family: "EB Garamond", category: "serif", weight: "medium", width: "normal", popularity: 87 },
-  { family: "Cormorant Garamond", category: "serif", weight: "medium", width: "normal", popularity: 75 },
-
-  // Regular serif fonts
-  { family: "PT Serif", category: "serif", weight: "regular", width: "normal", popularity: 85 },
-  { family: "Noto Serif", category: "serif", weight: "regular", width: "normal", popularity: 88 },
-  { family: "Source Serif Pro", category: "serif", weight: "regular", width: "normal", popularity: 82 },
-
-  // Bold sans-serif fonts
-  { family: "Montserrat", category: "sans-serif", weight: "bold", width: "normal", popularity: 98 },
-  { family: "Raleway", category: "sans-serif", weight: "bold", width: "normal", popularity: 95 },
-  { family: "Poppins", category: "sans-serif", weight: "bold", width: "normal", popularity: 97 },
-  { family: "Roboto", category: "sans-serif", weight: "medium", width: "normal", popularity: 99 },
-  { family: "Open Sans", category: "sans-serif", weight: "medium", width: "normal", popularity: 98 },
-  { family: "Lato", category: "sans-serif", weight: "medium", width: "normal", popularity: 96 },
-  { family: "Inter", category: "sans-serif", weight: "medium", width: "normal", popularity: 94 },
-  { family: "Nunito", category: "sans-serif", weight: "medium", width: "normal", popularity: 90 },
-
-  // Condensed sans-serif
-  { family: "Roboto Condensed", category: "sans-serif", weight: "medium", width: "condensed", popularity: 85 },
-  { family: "PT Sans Narrow", category: "sans-serif", weight: "medium", width: "condensed", popularity: 75 },
-
-  // Display fonts
-  { family: "Righteous", category: "display", weight: "bold", width: "normal", popularity: 70 },
-  { family: "Pacifico", category: "handwriting", weight: "regular", width: "normal", popularity: 85 },
-  { family: "Lobster", category: "display", weight: "bold", width: "normal", popularity: 80 },
-]
-
 export default function FontIdentifier() {
   const [image, setImage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -98,7 +56,7 @@ export default function FontIdentifier() {
     setError(null)
 
     try {
-      console.log("[v0] Sending image to AI vision model...")
+      console.log("[v0] Sending image to vision model for feature extraction...")
 
       const response = await fetch("/api/identify", {
         method: "POST",
@@ -111,7 +69,7 @@ export default function FontIdentifier() {
       }
 
       const results = await response.json()
-      console.log("[v0] AI results:", results)
+      console.log("[v0] Vision + vector results:", results)
 
       setFonts(results.fonts)
     } catch (error) {
@@ -172,7 +130,9 @@ export default function FontIdentifier() {
               <h2 className="text-2xl font-bold">
                 {loading ? "Analyzing with AI..." : error ? "Error" : `${fonts.length} fonts found`}
               </h2>
-              <p className="text-sm text-muted-foreground">{error ? error : "Powered by Fontjoy vector embeddings"}</p>
+              <p className="text-sm text-muted-foreground">
+                {error ? error : "Powered by AI vision + Fontjoy vector embeddings"}
+              </p>
             </div>
             <Button onClick={reset} variant="outline" size="sm">
               <X className="mr-2 h-4 w-4" />
